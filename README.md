@@ -9,6 +9,9 @@ Quick start (local)
    . .venv/bin/activate
    pip install -r requirements.txt
 
+   Use Python 3.11 or newer. The pinned FastAPI/Pydantic versions are required for
+   current Python typing behavior.
+
    # Optional development tools
    pip install -r requirements-dev.txt
 

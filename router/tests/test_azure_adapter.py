@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from adapters.azure_adapter import AzureAdapter
+from router.adapters.azure_adapter import AzureAdapter
 
 @pytest.mark.asyncio
 async def test_azure_adapter_chat_completions():
@@ -11,7 +11,7 @@ async def test_azure_adapter_chat_completions():
         "choices": [{"message": {"role": "assistant", "content": "hello from azure"}}],
     }
 
-    with patch("adapters.azure_adapter.AsyncAzureOpenAI") as mock_client_cls:
+    with patch("router.adapters.azure_adapter.AsyncAzureOpenAI") as mock_client_cls:
         mock_client = mock_client_cls.return_value
         # set nested async method
         mock_client.chat.completions.create = AsyncMock(return_value=fake_response)
@@ -43,7 +43,7 @@ async def test_azure_adapter_streaming():
         yield FakeChunk("hello")
         yield FakeChunk(" world")
 
-    with patch("adapters.azure_adapter.AsyncAzureOpenAI") as mock_client_cls:
+    with patch("router.adapters.azure_adapter.AsyncAzureOpenAI") as mock_client_cls:
         mock_client = mock_client_cls.return_value
         mock_client.chat.completions.create = AsyncMock(return_value=fake_stream())
 
@@ -69,7 +69,7 @@ async def test_azure_adapter_streaming():
 
 @pytest.mark.asyncio
 async def test_azure_adapter_closes_client():
-    with patch("adapters.azure_adapter.AsyncAzureOpenAI") as mock_client_cls:
+    with patch("router.adapters.azure_adapter.AsyncAzureOpenAI") as mock_client_cls:
         mock_client = mock_client_cls.return_value
         mock_client.aclose = AsyncMock()
 
@@ -91,7 +91,7 @@ async def test_azure_adapter_retries_transient_errors():
     fake_response = MagicMock()
     fake_response.model_dump.return_value = {"choices": []}
 
-    with patch("adapters.azure_adapter.AsyncAzureOpenAI") as mock_client_cls:
+    with patch("router.adapters.azure_adapter.AsyncAzureOpenAI") as mock_client_cls:
         mock_client = mock_client_cls.return_value
         mock_client.chat.completions.create = AsyncMock(
             side_effect=[TransientError(), fake_response]
