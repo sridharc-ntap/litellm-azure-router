@@ -9,6 +9,9 @@ Quick start (local)
    . .venv/bin/activate
    pip install -r requirements.txt
 
+   # Optional development tools
+   pip install -r requirements-dev.txt
+
 2. Set environment variables (see .env.example) or export real Azure values:
    export AZURE_OPENAI_API_KEY="..."
    export AZURE_OPENAI_API_BASE="https://<resource>.openai.azure.com"
@@ -26,3 +29,5 @@ Run tests:
 Notes
 - For production you should supply secrets via Kubernetes Secrets or a secret manager rather than env vars.
 - The Azure adapter uses the `openai` Python package AsyncAzureOpenAI client. Adjust if you use other SDK versions.
+- Streaming responses use Server-Sent Events. Each `data` payload includes `delta`, `role`, `provider`, and `done` fields.
+- Azure request timeout and retry settings can be passed to `AzureAdapter` or supplied through injected registry configuration.

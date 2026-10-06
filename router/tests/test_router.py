@@ -1,5 +1,6 @@
 import pytest
 from httpx import AsyncClient
+from unittest.mock import AsyncMock
 from router.app import app
 from adapters.registry import AdapterRegistry
 from adapters.mock_adapter import MockAdapter
@@ -24,3 +25,26 @@ async def test_chat_default_provider():
         data = r.json()
         assert "choices" in data
         assert data["choices"][0]["message"]["content"].startswith("echo")
+
+@pytest.mark.asyncio
+async def test_chat_stream_returns_sse_events():
+    async with AsyncClient(app=app, base_url="http://test") as ac:
+        payload = {"model": "gpt-4o", "messages": [{"role": "user", "content": "hello"}]}
+        response = await ac.post("/v1/chat/stream", json=payload)
+
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/event-stream")
+        assert '"provider": "mock"' in response.text
+        assert '"done": true' in response.text
+
+@pytest.mark.asyncio
+async def test_registry_closes_adapters():
+    reg = AdapterRegistry()
+    close = AsyncMock()
+    adapter = MockAdapter()
+    adapter.close = close
+    reg.register(adapter)
+
+    await reg.close()
+
+    close.assert_awaited_once_with()
