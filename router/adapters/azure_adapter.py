@@ -1,9 +1,10 @@
 import asyncio
+import inspect
 import os
 from typing import Any, AsyncIterator, Dict, Optional
 from openai import AsyncAzureOpenAI
 
-from .base import BaseAdapter
+from .base import BaseAdapter, StreamChunk
 
 class AzureAdapterError(RuntimeError):
     status_code = 502
@@ -46,7 +47,13 @@ class AzureAdapter(BaseAdapter):
         )
 
     async def close(self) -> None:
-        await self.client.aclose()
+        await self.aclose()
+
+    async def aclose(self) -> None:
+        cleanup = getattr(self.client, "aclose", None) or getattr(self.client, "close")
+        result = cleanup()
+        if inspect.isawaitable(result):
+            await result
 
     @staticmethod
     def _is_retryable(error: Exception) -> bool:
@@ -81,7 +88,7 @@ class AzureAdapter(BaseAdapter):
         # model_dump returns a serializable dict for the response object
         return response.model_dump()
 
-    async def stream_chat_completions(self, payload: Dict[str, Any]) -> AsyncIterator[Dict[str, Any]]:
+    async def stream_chat_completions(self, payload: Dict[str, Any]) -> AsyncIterator[StreamChunk]:
         model_name = payload.get("model") or self.azure_deployment
         stream = await self._create_completion(
             model=model_name,
