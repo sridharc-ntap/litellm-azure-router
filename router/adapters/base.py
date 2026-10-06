@@ -1,5 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Any, AsyncIterator, Dict
+from typing import Any, AsyncIterator, Dict, Optional, TypedDict
+
+class StreamChunk(TypedDict):
+    delta: str
+    role: Optional[str]
+    provider: str
+    done: bool
 
 class BaseAdapter(ABC):
     name: str
@@ -8,10 +14,10 @@ class BaseAdapter(ABC):
     async def chat_completions(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         raise NotImplementedError
 
-    async def stream_chat_completions(self, payload: Dict[str, Any]) -> AsyncIterator[Dict[str, Any]]:
+    async def stream_chat_completions(self, payload: Dict[str, Any]) -> AsyncIterator[StreamChunk]:
         """
-        Providers may stream token deltas. The fallback emits one structured completion
-        event so clients can use the same protocol for every provider.
+        Yield chunks with ``delta``, ``role``, ``provider``, and ``done`` fields.
+        The fallback emits one completion event followed by a terminal event.
         """
         result = await self.chat_completions(payload)
         content = result.get("choices", [{}])[0].get("message", {}).get("content", "")

@@ -25,6 +25,7 @@ async def test_chat_default_provider():
         data = r.json()
         assert "choices" in data
         assert data["choices"][0]["message"]["content"].startswith("echo")
+        assert r.headers["x-request-id"]
 
 @pytest.mark.asyncio
 async def test_chat_stream_returns_sse_events():
@@ -36,6 +37,17 @@ async def test_chat_stream_returns_sse_events():
         assert response.headers["content-type"].startswith("text/event-stream")
         assert '"provider": "mock"' in response.text
         assert '"done": true' in response.text
+
+@pytest.mark.asyncio
+async def test_health_and_metrics_endpoints():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        health = await ac.get("/healthz")
+        metrics = await ac.get("/metrics")
+
+        assert health.status_code == 200
+        assert health.json()["status"] == "ok"
+        assert metrics.status_code == 200
+        assert "router_requests_total" in metrics.text
 
 @pytest.mark.asyncio
 async def test_registry_closes_adapters():

@@ -1,7 +1,28 @@
 import pytest
+import inspect
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from openai import AsyncAzureOpenAI as SDKAsyncAzureOpenAI
 from router.adapters.azure_adapter import AzureAdapter
+
+@pytest.mark.asyncio
+async def test_openai_sdk_exposes_azure_client_contract():
+    parameters = inspect.signature(SDKAsyncAzureOpenAI).parameters
+
+    assert "timeout" in parameters
+    assert "max_retries" in parameters
+
+    client = SDKAsyncAzureOpenAI(
+        api_key="test-key",
+        azure_endpoint="https://example.openai.azure.com",
+        api_version="2024-02-01",
+        timeout=30.0,
+        max_retries=0,
+    )
+    assert isinstance(client, SDKAsyncAzureOpenAI)
+    result = client.close()
+    if inspect.isawaitable(result):
+        await result
 
 @pytest.mark.asyncio
 async def test_azure_adapter_chat_completions():

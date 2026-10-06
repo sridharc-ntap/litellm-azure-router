@@ -34,3 +34,32 @@ Notes
 - The Azure adapter uses the `openai` Python package AsyncAzureOpenAI client. Adjust if you use other SDK versions.
 - Streaming responses use Server-Sent Events. Each `data` payload includes `delta`, `role`, `provider`, and `done` fields.
 - Azure request timeout and retry settings can be passed to `AzureAdapter` or supplied through injected registry configuration.
+
+Example streaming client:
+```bash
+curl -N -X POST "http://localhost:8000/v1/chat/stream" \
+   -H "Content-Type: application/json" \
+   -d '{"model":"gpt-4o","messages":[{"role":"user","content":"hello"}]}'
+```
+
+Parse each `data: ...` line as JSON. The final event has `"done": true`.
+
+Operational endpoints
+- `GET /healthz` is a readiness probe and reports the registered providers.
+- `GET /metrics` exposes Prometheus request and provider-call metrics.
+- Every response includes an `X-Request-ID` header. Send your own value with that header to correlate logs across services.
+
+Injected adapter configuration
+```python
+registry = AdapterRegistry(config={
+   "azure": {
+      "api_key": "...",
+      "api_base": "https://example.openai.azure.com",
+      "azure_deployment": "gpt-4o",
+      "request_timeout": 20.0,
+      "max_retries": 3,
+      "retry_base_delay": 0.25,
+   }
+})
+```
+Use values loaded from Kubernetes Secrets and ConfigMaps in place of the literals, then install the registry as the application singleton before serving requests. Environment variables remain supported as the default bootstrap path.
