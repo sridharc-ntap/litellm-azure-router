@@ -4,7 +4,8 @@ image:
   repository: acr4llm.azurecr.io/litellm-router
   tag: 0.0.1
   pullPolicy: IfNotPresent
-  pullSecrets: []
+  pullSecrets:
+    - name: acr-registry-secret
 
 service:
   type: ClusterIP

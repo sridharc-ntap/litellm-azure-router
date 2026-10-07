@@ -7,10 +7,8 @@ pipeline {
     ACR_NAME = 'acr4llm'                       // e.g., myacr.azurecr.io
     IMAGE_REPO = "${env.ACR_NAME}.azurecr.io/litellm-router"
     K8S_NAMESPACE = 'llm-proxy'
-    ACR_SP_CLIENT_ID = '93a69b84-9fe0-4b6c-97df-067abe9da25c'
     ACR_SP_TENANT_ID = 'd391996a-90c3-4732-8d2d-5203c94f2995'
-    ACR_SP_SECRET_NAME = 'acr-push-sp'
-    ACR_SP_SECRET_KEY = 'client-secret'
+    ACR_CREDENTIALS_ID = 'acr-sp-credentials'
     GIT_PUSH_CRED = 'gitea-git-write'
     GIT_BRANCH_NAME = 'master'
     CHART_DIR = 'charts/litellm-router'
@@ -51,26 +49,21 @@ pipeline {
 
     stage('Build & Push Image') {
       steps {
-        // Jenkins runs in AKS, so use the agent pod's service-account token.
-        sh '''
-          KUBE_TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
-          KUBE_CA="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
-          kube() {
-            kubectl --server="https://${KUBERNETES_SERVICE_HOST}:443" \
-              --certificate-authority="$KUBE_CA" \
-              --token="$KUBE_TOKEN" "$@"
-          }
-          ACR_SP_SECRET="$(kube get secret "${ACR_SP_SECRET_NAME}" -n "${K8S_NAMESPACE}" -o jsonpath="{.data['${ACR_SP_SECRET_KEY}']}" | base64 --decode)"
-          test -n "$ACR_SP_SECRET" || { echo "ACR service-principal Secret is empty or missing" >&2; exit 1; }
-          az login --service-principal \
-            --username "$ACR_SP_CLIENT_ID" \
-            --password "$ACR_SP_SECRET" \
-            --tenant "$ACR_SP_TENANT_ID" \
-            --output none
-          az acr login --name "$ACR_NAME"
-          docker build -t ${IMAGE_REPO}:${IMAGE_TAG} .
-          docker push ${IMAGE_REPO}:${IMAGE_TAG}
-        '''
+        // Jenkins credential type: Username with password.
+        // Username is the service-principal client ID; password is its client secret.
+        withCredentials([usernamePassword(credentialsId: env.ACR_CREDENTIALS_ID, usernameVariable: 'ACR_CLIENT_ID', passwordVariable: 'ACR_CLIENT_SECRET')]) {
+          sh '''
+            set -eu
+            az login --service-principal \
+              --username "$ACR_CLIENT_ID" \
+              --password "$ACR_CLIENT_SECRET" \
+              --tenant "$ACR_SP_TENANT_ID" \
+              --output none
+            az acr login --name "$ACR_NAME"
+            docker build -t "${IMAGE_REPO}:${IMAGE_TAG}" .
+            docker push "${IMAGE_REPO}:${IMAGE_TAG}"
+          '''
+        }
       }
     }
 
