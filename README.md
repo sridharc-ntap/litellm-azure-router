@@ -35,6 +35,13 @@ Notes
 - Streaming responses use Server-Sent Events. Each `data` payload includes `delta`, `role`, `provider`, and `done` fields.
 - Azure request timeout and retry settings can be passed to `AzureAdapter` or supplied through injected registry configuration.
 
+Kubernetes deployment contract
+- The Jenkins pipeline deploys and smoke-tests in the `llm-proxy` namespace.
+- Jenkins must have a Username with password credential named `acr-sp-credentials`. Store the service-principal client ID as the username and its client secret as the password. The pipeline passes these values to `az login`; it does not read ACR credentials from Kubernetes.
+- The application Secret is named `azure-openai` by default and is consumed by the Deployment through `envFrom`. It must also exist in `llm-proxy`, unless `azure.secretName` is overridden in Helm values.
+- `image.pullSecrets` is empty by default. ACR push authentication for Jenkins does not provide pod image-pull credentials; configure an image pull Secret in the release namespace or use AKS/workload identity separately.
+- Argo CD remains the deployment owner: Jenkins pushes the image and updates the GitOps image tag, then Argo CD syncs the chart. Do not run a separate `helm upgrade` from Jenkins for the same release.
+
 Example streaming client:
 ```bash
 curl -N -X POST "http://localhost:8000/v1/chat/stream" \
