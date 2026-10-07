@@ -1,0 +1,38 @@
+replicaCount: 2
+
+image:
+  repository: acr4llm.azurecr.io/litellm-router
+  tag: 0.0.1
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 1
+    memory: 1Gi
+
+azure:
+  secretName: azure-openai
+  # The secret keys expected:
+  # AZURE_OPENAI_API_KEY, AZURE_OPENAI_API_BASE, AZURE_OPENAI_API_VERSION, AZURE_OPENAI_DEPLOYMENT
+
+readinessProbe:
+  path: /healthz
+  initialDelaySeconds: 6
+  periodSeconds: 10
+
+livenessProbe:
+  path: /healthz
+  initialDelaySeconds: 20
+  periodSeconds: 20
+
+affinity: {}
+nodeSelector: {}
+tolerations: []

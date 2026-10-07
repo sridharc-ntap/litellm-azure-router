@@ -1,0 +1,101 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jenkins-pvc
+  namespace: infra
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: default
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins-agent
+  namespace: infra
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jenkins-router-deployer
+  namespace: llm-proxy
+rules:
+  - apiGroups: [""]
+    resources:
+      - secrets
+    resourceNames:
+      - acr-push-sp
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-router-deployer
+  namespace: llm-proxy
+subjects:
+  - kind: ServiceAccount
+    name: jenkins-agent
+    namespace: infra
+roleRef:
+  kind: Role
+  name: jenkins-router-deployer
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jenkins
+  namespace: infra
+  labels:
+    app: jenkins
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jenkins
+  template:
+    metadata:
+      labels:
+        app: jenkins
+    spec:
+      serviceAccountName: jenkins-agent
+      automountServiceAccountToken: true
+      containers:
+        - name: jenkins
+          image: jenkins/jenkins:lts-jdk17
+          securityContext:
+            runAsUser: 0
+          ports:
+            - containerPort: 8080
+              name: web-ui
+            - containerPort: 50000
+              name: agent-sync
+          volumeMounts:
+            - name: jenkins-storage
+              mountPath: /var/jenkins_home
+      volumes:
+        - name: jenkins-storage
+          persistentVolumeClaim:
+            claimName: jenkins-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jenkins-service
+  namespace: infra
+spec:
+  type: ClusterIP
+  selector:
+    app: jenkins
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+    - name: agent
+      port: 50000
+      targetPort: 50000
