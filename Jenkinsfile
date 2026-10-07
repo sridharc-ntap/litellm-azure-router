@@ -80,17 +80,9 @@ pipeline {
               -e "s|^  tag:.*|  tag: ${IMAGE_TAG}|" \
               "${VALUES_FILE}"
 
-            git diff --check
-            if git diff --quiet -- "${VALUES_FILE}"; then
-              echo "${VALUES_FILE} already references ${IMAGE_REPO}:${IMAGE_TAG}"
-              exit 0
-            fi
-
-            git config user.name 'Jenkins'
-            git config user.email 'jenkins@localhost'
-            git add "${VALUES_FILE}"
-            git commit -m "Update LiteLLM image to ${IMAGE_TAG} [skip ci]"
-            git push origin "HEAD:${GIT_BRANCH_NAME}"
+            steps {
+              sh "helm upgrade --install litellm-router charts/litellm-router --namespace ${K8S_NAMESPACE} --set image.repository=${IMAGE_REPO} --set image.tag=${IMAGE_TAG} --create-namespace"
+            }
           '''
         }
       }
