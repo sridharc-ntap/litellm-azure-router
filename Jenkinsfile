@@ -13,7 +13,8 @@ pipeline {
     ACR_SP_SECRET_KEY = 'client-secret'
     GIT_PUSH_CRED = 'gitea-git-write'
     GIT_BRANCH_NAME = 'master'
-    VALUES_FILE = 'chart/litellm-router/values.yaml'
+    CHART_DIR = 'charts/litellm-router'
+    VALUES_FILE = 'charts/litellm-router/values.yaml'
   }
 
   stages {
@@ -31,6 +32,20 @@ pipeline {
         sh 'python -m pip install --upgrade pip'
         sh 'pip install -r requirements.txt -r requirements-dev.txt'
         sh 'pytest -q'
+      }
+    }
+
+    stage('Validate Helm chart') {
+      steps {
+        sh '''
+          set -eu
+          helm lint "${CHART_DIR}"
+          helm template litellm-router "${CHART_DIR}" \
+            --namespace "${K8S_NAMESPACE}" \
+            --set image.repository="${IMAGE_REPO}" \
+            --set image.tag="${IMAGE_TAG}" \
+            >/tmp/litellm-router-rendered.yaml
+        '''
       }
     }
 
@@ -80,9 +95,17 @@ pipeline {
               -e "s|^  tag:.*|  tag: ${IMAGE_TAG}|" \
               "${VALUES_FILE}"
 
-            steps {
-              sh "helm upgrade --install litellm-router charts/litellm-router --namespace ${K8S_NAMESPACE} --set image.repository=${IMAGE_REPO} --set image.tag=${IMAGE_TAG} --create-namespace"
+              git diff --check
+              if git diff --quiet -- "${VALUES_FILE}"; then
+                echo "${VALUES_FILE} already references ${IMAGE_REPO}:${IMAGE_TAG}"
+                exit 0
             }
+
+              git config user.name 'Jenkins'
+              git config user.email 'jenkins@localhost'
+              git add "${VALUES_FILE}"
+              git commit -m "Update LiteLLM image to ${IMAGE_TAG} [skip ci]"
+              git push origin "HEAD:${GIT_BRANCH_NAME}"
           '''
         }
       }
